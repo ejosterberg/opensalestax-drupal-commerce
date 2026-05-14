@@ -6,10 +6,12 @@ declare(strict_types=1);
 
 namespace Drupal\opensalestax_commerce\Plugin\Commerce\TaxType;
 
-use Drupal\Component\Plugin\PluginBase;
-use Drupal\Core\DependencyInjection\ContainerInjectionInterface;
+use Drupal\commerce_order\Entity\OrderInterface;
+use Drupal\commerce_tax\Plugin\Commerce\TaxType\RemoteTaxTypeBase;
+use Drupal\Core\Entity\EntityTypeManagerInterface;
 use Drupal\opensalestax_commerce\Service\TaxCalculator;
 use Symfony\Component\DependencyInjection\ContainerInterface;
+use Symfony\Contracts\EventDispatcher\EventDispatcherInterface;
 
 /**
  * Drupal Commerce tax type plugin: OpenSalesTax.
@@ -34,13 +36,10 @@ use Symfony\Component\DependencyInjection\ContainerInterface;
  *    jurisdiction returned. Falls back to a single combined adjustment
  *    when the engine response has no jurisdiction breakdown.
  *
- * Why we don't extend RemoteTaxTypeBase: Drupal Commerce's remote base
- * class hardcodes a fixed customer-profile shape and a fail-hard
- * exception model. We need fail-soft + ZIP-only addressing, so we
- * inherit from the lighter PluginBase and implement the interface
- * methods directly.
+ * Extends RemoteTaxTypeBase to satisfy Drupal Commerce's TaxTypeInterface
+ * contract; overrides applies() + apply() with our fail-soft, ZIP-only logic.
  */
-class OpenSalesTax extends PluginBase implements ContainerInjectionInterface {
+class OpenSalesTax extends RemoteTaxTypeBase {
 
   /**
    * The injected tax calculator service.
@@ -52,8 +51,15 @@ class OpenSalesTax extends PluginBase implements ContainerInjectionInterface {
   /**
    * {@inheritdoc}
    */
-  public function __construct(array $configuration, $plugin_id, $plugin_definition, ?TaxCalculator $calculator = NULL) {
-    parent::__construct($configuration, $plugin_id, $plugin_definition);
+  public function __construct(
+    array $configuration,
+    $plugin_id,
+    $plugin_definition,
+    EntityTypeManagerInterface $entity_type_manager,
+    EventDispatcherInterface $event_dispatcher,
+    ?TaxCalculator $calculator = NULL,
+  ) {
+    parent::__construct($configuration, $plugin_id, $plugin_definition, $entity_type_manager, $event_dispatcher);
     if ($calculator !== NULL) {
       $this->calculator = $calculator;
     }
@@ -65,11 +71,13 @@ class OpenSalesTax extends PluginBase implements ContainerInjectionInterface {
   public static function create(ContainerInterface $container, array $configuration = [], $plugin_id = '', $plugin_definition = NULL): self {
     $calculator = $container->get('opensalestax_commerce.tax_calculator');
     assert($calculator instanceof TaxCalculator);
-    $definition = is_array($plugin_definition) ? $plugin_definition : NULL;
+    $definition = is_array($plugin_definition) ? $plugin_definition : ['id' => $plugin_id, 'label' => 'OpenSalesTax'];
     return new self(
       $configuration,
       (string) $plugin_id,
       $definition,
+      $container->get('entity_type.manager'),
+      $container->get('event_dispatcher'),
       $calculator
     );
   }
@@ -81,14 +89,13 @@ class OpenSalesTax extends PluginBase implements ContainerInjectionInterface {
    * matches TaxCalculator's gate but short-circuits earlier so we
    * don't waste a service-container lookup on Canadian / EUR orders.
    *
-   * @param object $order
-   *   The Drupal Commerce OrderInterface (typed as object so static
-   *   analysis doesn't require the commerce module).
+   * @param \Drupal\commerce_order\Entity\OrderInterface $order
+   *   The Drupal Commerce order.
    *
    * @return bool
    *   TRUE if the order is eligible for OpenSalesTax calculation.
    */
-  public function applies(object $order): bool {
+  public function applies(OrderInterface $order) {
     $shipping = $this->extractShippingPostalContext($order);
     if ($shipping === NULL) {
       return FALSE;
@@ -111,10 +118,10 @@ class OpenSalesTax extends PluginBase implements ContainerInjectionInterface {
    * and append adjustments. On fail-soft (calculator returns NULL) we
    * append nothing — Drupal Commerce treats that as no-tax.
    *
-   * @param object $order
-   *   The Drupal Commerce OrderInterface.
+   * @param \Drupal\commerce_order\Entity\OrderInterface $order
+   *   The Drupal Commerce order.
    */
-  public function apply(object $order): void {
+  public function apply(OrderInterface $order) {
     $shipping = $this->extractShippingPostalContext($order);
     if ($shipping === NULL) {
       return;
@@ -417,11 +424,15 @@ class OpenSalesTax extends PluginBase implements ContainerInjectionInterface {
         continue;
       }
       foreach ($jurisdictions as $jurisdiction) {
+        // The SDK's JurisdictionRate exposes (name, type, ratePct, tax) —
+        // we synthesise a stable source_id from type + name for adjustment
+        // dedup / cancellation correlation. No `code` field exists.
+        $sourceKey = strtolower(($jurisdiction->type ?? 'tax') . ':' . ($jurisdiction->name ?? 'unknown'));
         $order->addAdjustment(new $adjustmentClass([
           'type' => 'tax',
           'label' => $this->jurisdictionLabel($jurisdiction),
           'amount' => new $priceClass($jurisdiction->tax, $currency),
-          'source_id' => 'opensalestax:' . $jurisdiction->code,
+          'source_id' => 'opensalestax:' . $sourceKey,
           'percentage' => $jurisdiction->ratePct,
         ]));
       }
