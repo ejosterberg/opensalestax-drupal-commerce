@@ -1,0 +1,7 @@
+opensalestax_commerce.settings_form:
+  path: '/admin/commerce/config/opensalestax'
+  defaults:
+    _form: '\Drupal\opensalestax_commerce\Form\SettingsForm'
+    _title: 'OpenSalesTax'
+  requirements:
+    _permission: 'administer commerce_tax_type'

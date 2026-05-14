@@ -1,0 +1,10 @@
+name: 'OpenSalesTax for Drupal Commerce'
+type: module
+description: 'Destination-based US sales tax via the OpenSalesTax engine. Calculation only; the merchant remits.'
+package: 'Commerce (contrib)'
+core_version_requirement: ^10.3 || ^11
+dependencies:
+  - commerce:commerce
+  - commerce:commerce_tax
+  - drupal:system
+configure: opensalestax_commerce.settings_form

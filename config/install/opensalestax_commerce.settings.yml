@@ -1,0 +1,6 @@
+api_url: ''
+api_key: ''
+restrict_to_public_ips: true
+cache_ttl_seconds: 86400
+fail_hard: false
+timeout_seconds: 10

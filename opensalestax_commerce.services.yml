@@ -1,0 +1,21 @@
+services:
+  logger.channel.opensalestax:
+    parent: logger.channel_base
+    arguments: ['opensalestax']
+
+  opensalestax_commerce.url_validator:
+    class: Drupal\opensalestax_commerce\Service\UrlValidator
+
+  opensalestax_commerce.client_factory:
+    class: Drupal\opensalestax_commerce\Service\ClientFactory
+    arguments:
+      - '@config.factory'
+      - '@opensalestax_commerce.url_validator'
+
+  opensalestax_commerce.tax_calculator:
+    class: Drupal\opensalestax_commerce\Service\TaxCalculator
+    arguments:
+      - '@opensalestax_commerce.client_factory'
+      - '@config.factory'
+      - '@cache.default'
+      - '@logger.channel.opensalestax'

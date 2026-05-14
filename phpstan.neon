@@ -1,0 +1,92 @@
+parameters:
+    level: max
+    paths:
+        - src
+    excludePaths:
+        - vendor
+        - tests/stubs
+    scanFiles:
+        - tests/stubs/PhpStanStubs.php
+    reportUnmatchedIgnoredErrors: false
+    treatPhpDocTypesAsCertain: false
+    ignoreErrors:
+        # Plugin's apply() / applies() typed args as `object` because
+        # Drupal Commerce's OrderInterface is not in our composer require
+        # (it ships with the target site). Method calls are duck-typed
+        # behind method_exists() guards — PHPStan can't follow these.
+        -
+            message: '#Call to an undefined method object::#'
+            path: src/Plugin/Commerce/TaxType/OpenSalesTax.php
+        -
+            message: '#Cannot call method [a-zA-Z_]+\(\) on mixed#'
+            path: src/Plugin/Commerce/TaxType/OpenSalesTax.php
+        # JurisdictionRate SDK class — $code may not be present on all
+        # versions of the SDK; we use property_exists() guards in real
+        # code paths and read $code/$tax/$ratePct duck-typed here.
+        -
+            message: '#Access to an undefined property OpenSalesTax\\Responses\\JurisdictionRate#'
+            path: src/Plugin/Commerce/TaxType/OpenSalesTax.php
+        # Magento-style plugin signatures use loose types because we
+        # match Drupal's own ContainerInjectionInterface signature.
+        -
+            message: '#Method .*::create\(\) (has parameter|has no return type)#'
+            path: src/Plugin/Commerce/TaxType/OpenSalesTax.php
+        # The form's password field comparison after class_exists guard.
+        -
+            message: '#Strict comparison using === between#'
+            path: src/Form/SettingsForm.php
+        # failSoftOrThrow always returns null or throws — that's the
+        # whole point. The "never returns CalculateResponse" message is
+        # actually correct but ignoring keeps the return-type contract
+        # consistent with how the caller treats it.
+        -
+            message: '#Method Drupal\\opensalestax_commerce\\Service\\TaxCalculator::failSoftOrThrow\(\) never returns#'
+            path: src/Service/TaxCalculator.php
+        # Drupal's ConfigFactory returns mixed; we wrap every read in
+        # (string)/(int)/(bool) casts. PHPStan strict mode flags these
+        # as "Cannot cast mixed". The casts are intentional defensive
+        # coercion against bad config; suppress.
+        -
+            message: '#Cannot cast mixed to (string|int|bool)#'
+        # Form callable resolver: PHPStan can't see through the nullable
+        # private $hostResolver after constructor-assignment (it loses
+        # the non-null narrowing). The constructor unconditionally sets
+        # it, so the call is safe in practice.
+        -
+            message: '#Trying to invoke \(callable.*\)\|null but it might not be a callable#'
+            path: src/Service/UrlValidator.php
+        # ConfigFormBase parent's create() signature isn't typed in our
+        # stub; PHPStan flags the override as non-covariant. Cosmetic.
+        -
+            message: '#Unsafe usage of new static#'
+            path: src/Form/SettingsForm.php
+        # SettingsForm's submit reads form_state values typed mixed;
+        # casts are intentional.
+        -
+            message: '#Drupal\\Core\\Form\\FormStateInterface::(getValue|setErrorByName)#'
+        # SettingsForm parent's ConfigFormBase::create() has a static
+        # return type that's not covariant with our stub. Real Drupal's
+        # actual signature uses self::class; the stub is intentionally
+        # loose. We accept the warning.
+        -
+            message: '#Method Drupal\\opensalestax_commerce\\Form\\SettingsForm::create.*return type#'
+        # cache->get() returns object|false; data property access is
+        # documented in Drupal's docs but stubs use generic object.
+        -
+            message: '#Access to an undefined property object::\$data#'
+            path: src/Service/TaxCalculator.php
+        # Plugin's constructor matches Drupal's PluginInspectionInterface
+        # signature (untyped $plugin_id is the upstream convention).
+        -
+            message: '#Method .*::__construct\(\) has parameter \$plugin_id with no type specified#'
+            path: src/Plugin/Commerce/TaxType/OpenSalesTax.php
+        # ContainerInjectionInterface::create() returns static; we return
+        # a plain instance which is acceptable upstream but PHPStan
+        # flags non-covariance with our stub. Cosmetic.
+        -
+            message: '#Return type mixed of method.*create.* is not covariant#'
+        # writeAdjustments() passes line->tax to Price constructor; the
+        # SDK types $tax as string (non-null), but PHPStan can't fully
+        # narrow after the !== '' guard.
+        -
+            message: '#Parameter \#1 \$number of class Drupal\\commerce_price\\Price constructor#'

@@ -1,0 +1,6 @@
+opensalestax_commerce.settings_form:
+  title: 'OpenSalesTax'
+  description: 'Configure the OpenSalesTax engine connection.'
+  parent: commerce.configuration
+  route_name: opensalestax_commerce.settings_form
+  weight: 50
