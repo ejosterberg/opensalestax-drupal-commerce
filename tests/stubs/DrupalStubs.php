@@ -224,3 +224,11 @@ namespace Drupal\Core\Entity {
   }
 }
 
+namespace Symfony\Contracts\EventDispatcher {
+  if (!interface_exists('Symfony\Contracts\EventDispatcher\EventDispatcherInterface')) {
+    interface EventDispatcherInterface {
+      public function dispatch(object $event, ?string $eventName = null): object;
+    }
+  }
+}
+
