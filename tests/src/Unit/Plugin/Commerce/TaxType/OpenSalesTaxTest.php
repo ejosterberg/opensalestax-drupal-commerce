@@ -382,7 +382,9 @@ PHP
   }
 
   private function makePlugin(TaxCalculator $calculator): OpenSalesTax {
-    return new OpenSalesTax([], 'opensalestax', NULL, $calculator);
+    $entityTypeManager = $this->createStub(\Drupal\Core\Entity\EntityTypeManagerInterface::class);
+    $eventDispatcher = $this->createStub(\Symfony\Contracts\EventDispatcher\EventDispatcherInterface::class);
+    return new OpenSalesTax([], 'opensalestax', NULL, $entityTypeManager, $eventDispatcher, $calculator);
   }
 
 }

@@ -173,3 +173,54 @@ namespace Drupal\Core\Form {
     }
   }
 }
+
+// RemoteTaxTypeBase stub — needed because the src/Plugin/Commerce/TaxType/OpenSalesTax
+// class extends Drupal Commerce's RemoteTaxTypeBase. Unit tests don't pull Drupal in.
+namespace Drupal\commerce_tax\Plugin\Commerce\TaxType {
+  if (!class_exists('Drupal\commerce_tax\Plugin\Commerce\TaxType\RemoteTaxTypeBase')) {
+    abstract class RemoteTaxTypeBase {
+
+      /** @var array<string, mixed> */
+      protected array $configuration;
+      protected string $pluginId;
+      /** @var array<string, mixed>|null */
+      protected ?array $pluginDefinition;
+
+      /**
+       * @param array<string, mixed> $configuration
+       * @param string|int $plugin_id
+       * @param array<string, mixed>|null $plugin_definition
+       */
+      public function __construct(
+        array $configuration,
+        $plugin_id,
+        $plugin_definition,
+        $entity_type_manager,
+        $event_dispatcher
+      ) {
+        $this->configuration = $configuration;
+        $this->pluginId = (string) $plugin_id;
+        $this->pluginDefinition = is_array($plugin_definition) ? $plugin_definition : NULL;
+      }
+
+      public function getPluginId(): string {
+        return $this->pluginId;
+      }
+
+      /** @return array<string, mixed>|null */
+      public function getPluginDefinition(): ?array {
+        return $this->pluginDefinition;
+      }
+
+    }
+  }
+}
+
+namespace Drupal\Core\Entity {
+  if (!interface_exists('Drupal\Core\Entity\EntityTypeManagerInterface')) {
+    interface EntityTypeManagerInterface {
+      public function getStorage(string $entity_type_id): mixed;
+    }
+  }
+}
+
